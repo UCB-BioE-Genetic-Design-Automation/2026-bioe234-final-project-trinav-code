@@ -1,0 +1,112 @@
+{
+  "id": "org.bioe234.function.crispr.delivery_advisor.v1",
+  "name": "CRISPR Delivery Strategy Advisor",
+  "description": "Recommends and ranks CRISPR delivery methods (lipofection, electroporation, RNP, AAV, lentiviral, etc.) for a given cell type and Cas variant, with rationale and key considerations for each.",
+  "type": "function",
+  "keywords": ["CRISPR", "delivery", "transfection", "electroporation", "AAV", "RNP", "lipofection", "lentiviral", "Cas9"],
+  "date_created": null,
+  "date_last_modified": null,
+
+  "inputs": [
+    {
+      "name": "cell_type",
+      "type": "string",
+      "description": "The target cell type for CRISPR editing (e.g. 'HEK293', 'primary T cells', 'neurons', 'iPSCs', 'hepatocytes')."
+    },
+    {
+      "name": "cas_variant",
+      "type": "string",
+      "description": "The CRISPR-Cas variant being used (e.g. 'SpCas9', 'SaCas9', 'CBE4max', 'PE2')."
+    },
+    {
+      "name": "edit_type",
+      "type": "string",
+      "description": "The type of genome edit to perform (e.g. 'knockout', 'knock-in', 'base edit', 'prime edit'). Defaults to 'knockout' if not provided."
+    }
+  ],
+
+  "outputs": [
+    {
+      "type": "object",
+      "description": "A ranked list of delivery methods with suitability ratings, rationale, and key considerations, plus a top recommendation and general advice."
+    }
+  ],
+
+  "examples": [
+    {
+      "input": {
+        "cell_type": "HEK293",
+        "cas_variant": "SpCas9",
+        "edit_type": "knockout"
+      },
+      "output": {
+        "result": {
+          "top_recommendation": "Lipofection (plasmid or RNP)",
+          "ranked_methods": [
+            {
+              "method": "Lipofection (plasmid)",
+              "suitability": "high",
+              "rationale": "HEK293 cells are highly transfectable with lipid-based reagents. Plasmid delivery of SpCas9 and sgRNA is simple and cost-effective for knockout.",
+              "key_considerations": ["High transfection efficiency in HEK293", "Transient expression reduces off-target risk"]
+            },
+            {
+              "method": "RNP electroporation",
+              "suitability": "high",
+              "rationale": "Pre-assembled Cas9 RNP complexes offer rapid editing with minimal off-target activity due to transient presence.",
+              "key_considerations": ["No DNA integration risk", "Fast clearance reduces off-targets"]
+            },
+            {
+              "method": "Lentiviral transduction",
+              "suitability": "medium",
+              "rationale": "Provides stable expression but carries integration risk, which is unnecessary for simple knockouts.",
+              "key_considerations": ["Genomic integration risk", "Constitutive expression increases off-targets"]
+            }
+          ],
+          "general_advice": "For HEK293 knockouts with SpCas9, lipofection is the simplest and most cost-effective approach. Consider RNP electroporation if off-target minimization is critical."
+        }
+      }
+    },
+    {
+      "input": {
+        "cell_type": "primary T cells",
+        "cas_variant": "SpCas9",
+        "edit_type": "knockout"
+      },
+      "output": {
+        "result": {
+          "top_recommendation": "RNP electroporation",
+          "ranked_methods": [
+            {
+              "method": "RNP electroporation",
+              "suitability": "high",
+              "rationale": "Primary T cells are resistant to lipofection but respond well to electroporation. RNP format avoids DNA toxicity in primary immune cells.",
+              "key_considerations": ["Standard method for T cell engineering", "No risk of insertional mutagenesis"]
+            },
+            {
+              "method": "Lentiviral transduction",
+              "suitability": "medium",
+              "rationale": "Can deliver Cas9 efficiently but introduces integration risk, which may be undesirable for therapeutic applications.",
+              "key_considerations": ["Integration risk", "Requires activation of T cells"]
+            },
+            {
+              "method": "AAV",
+              "suitability": "low",
+              "rationale": "AAV has limited cargo capacity and SpCas9 exceeds the packaging limit, making it unsuitable for this combination.",
+              "key_considerations": ["SpCas9 exceeds AAV packaging limit (~4.7 kb)", "Low efficiency in T cells"]
+            }
+          ],
+          "general_advice": "RNP electroporation is the gold standard for editing primary T cells with SpCas9. Optimize electroporation parameters for your specific T cell subtype and activation state."
+        }
+      }
+    }
+  ],
+
+  "execution_details": {
+    "language": "Python",
+    "source": "modules/delivery_advisor/tools/delivery_advisor.py",
+    "initialization": "initiate",
+    "execution": "run",
+    "disposal": null,
+    "mcp_name": "crispr_delivery_advisor"
+  }
+}

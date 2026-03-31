@@ -1,0 +1,32 @@
+[
+  {
+    "prompt": "What delivery method should I use for a SpCas9 knockout in HEK293 cells?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "HEK293", "cas_variant": "SpCas9", "edit_type": "knockout" },
+    "notes": "Standard cell line knockout — should recommend lipofection or electroporation."
+  },
+  {
+    "prompt": "I need to knock out a gene in primary T cells using SpCas9. What's the best way to deliver the CRISPR components?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "primary T cells", "cas_variant": "SpCas9", "edit_type": "knockout" },
+    "notes": "Primary immune cells — should recommend RNP electroporation."
+  },
+  {
+    "prompt": "How should I deliver CBE4max to neurons for a base editing experiment?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "neurons", "cas_variant": "CBE4max", "edit_type": "base edit" },
+    "notes": "Post-mitotic cells with a large editor — should consider AAV or lentiviral."
+  },
+  {
+    "prompt": "I'm planning a prime editing experiment in iPSCs with PE2. What delivery strategy do you recommend?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "iPSCs", "cas_variant": "PE2", "edit_type": "prime edit" },
+    "notes": "Stem cells with a large prime editor — electroporation of mRNA or plasmid likely."
+  },
+  {
+    "prompt": "What's the best approach to deliver SaCas9 for a knock-in in hepatocytes?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "hepatocytes", "cas_variant": "SaCas9", "edit_type": "knock-in" },
+    "notes": "Liver cells with a smaller Cas variant — AAV or LNP should be considered."
+  }
+]
