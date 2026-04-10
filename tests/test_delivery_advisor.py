@@ -95,3 +95,88 @@ def test_default_edit_type(advisor):
     # Calling run() with only 2 args should not raise
     result = advisor.run(cell_type="HEK293", cas_variant="SpCas9")
     assert "top_recommendation" in result
+
+
+# --- Edge-case tests (knowledge-base grounded) ---
+
+def _combined_text(result):
+    """Flatten a result into one lowercase string for keyword searches."""
+    parts = [result["top_recommendation"], result["general_advice"]]
+    for m in result["ranked_methods"]:
+        parts.append(m["method"])
+        parts.append(m["rationale"])
+        parts.extend(m.get("key_considerations", []))
+    return " ".join(parts).lower()
+
+
+def test_large_base_editor_avoids_single_aav(advisor):
+    """ABE8e (~5.5 kb) exceeds the ~4.7 kb AAV cargo limit. The top recommendation
+    must not be single AAV — acceptable answers are dual-AAV, LNP, eVLP, or
+    electroporation/RNP."""
+    result = advisor.run(
+        cell_type="hepatocytes", cas_variant="ABE8e", edit_type="base edit"
+    )
+    top = result["top_recommendation"].lower()
+    # Single AAV should not be the top pick; dual-AAV / LNP / eVLP / RNP are acceptable
+    is_single_aav = "aav" in top and "dual" not in top and "dual-aav" not in top
+    assert not is_single_aav, f"Top rec is single AAV for large BE: {top}"
+    # The combined response should mention at least one large-editor-compatible method
+    combined = _combined_text(result)
+    assert any(k in combined for k in ["dual-aav", "dual aav", "lnp", "evlp", "lipid nanoparticle"]), \
+        f"No large-editor-compatible method mentioned: {combined[:400]}"
+
+
+def test_plant_cells_recommend_biolistics(advisor):
+    """Plant cells with walls — biolistics (gene gun) should appear prominently."""
+    result = advisor.run(
+        cell_type="Arabidopsis protoplasts and callus",
+        cas_variant="SpCas9",
+        edit_type="knockout",
+    )
+    combined = _combined_text(result)
+    assert any(k in combined for k in ["biolistic", "gene gun", "particle bombardment", "agrobacterium"]), \
+        f"No plant-appropriate method mentioned: {combined[:400]}"
+
+
+def test_in_vivo_brain_recommends_cns_tropic_aav(advisor):
+    """In vivo brain delivery of SaCas9 should surface AAV9 or AAV-PHP.eB (CNS tropism)."""
+    result = advisor.run(
+        cell_type="in vivo mouse brain (striatum)",
+        cas_variant="SaCas9",
+        edit_type="knockout",
+    )
+    combined = _combined_text(result)
+    assert "aav" in combined, f"AAV not mentioned for in vivo brain: {combined[:400]}"
+    # At least one CNS-tropic serotype should be mentioned
+    assert any(k in combined for k in ["aav9", "php.eb", "php-eb", "phpeb", "cns"]), \
+        f"No CNS tropism discussed: {combined[:400]}"
+
+
+def test_ipsc_cardiomyocytes_handled(advisor):
+    """iPSC-derived cardiomyocytes are post-mitotic and hard to transfect. The advisor
+    should return a valid structured response and mention an appropriate method
+    (AAV, lentivirus, RNP electroporation of iPSCs pre-differentiation, or eVLP)."""
+    result = advisor.run(
+        cell_type="iPSC-derived cardiomyocytes",
+        cas_variant="SpCas9",
+        edit_type="knock-in",
+    )
+    assert "top_recommendation" in result
+    assert len(result["ranked_methods"]) >= 3
+    combined = _combined_text(result)
+    assert any(k in combined for k in ["aav", "lentivir", "electroporation", "rnp", "evlp"]), \
+        f"No appropriate cardiomyocyte method mentioned: {combined[:400]}"
+
+
+def test_clinical_context_favors_transient_delivery(advisor):
+    """For therapeutic ex vivo T cell editing, transient delivery (RNP electroporation)
+    should be the top pick — integrating lentivirus is not preferred for clinical
+    therapeutic editing (though it is standard for CAR-T transgene delivery)."""
+    result = advisor.run(
+        cell_type="primary human T cells for clinical therapeutic editing",
+        cas_variant="SpCas9",
+        edit_type="knockout",
+    )
+    top = result["top_recommendation"].lower()
+    assert "rnp" in top or "electroporation" in top, \
+        f"Clinical T cell editing top rec is not RNP/electroporation: {top}"

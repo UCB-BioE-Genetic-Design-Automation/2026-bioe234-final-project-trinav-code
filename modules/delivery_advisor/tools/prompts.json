@@ -28,5 +28,35 @@
     "expected_tool": "crispr_delivery_advisor",
     "expected_args": { "cell_type": "hepatocytes", "cas_variant": "SaCas9", "edit_type": "knock-in" },
     "notes": "Liver cells with a smaller Cas variant — AAV or LNP should be considered."
+  },
+  {
+    "prompt": "I want to use ABE8e to do a base edit in hepatocytes. What delivery should I use?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "hepatocytes", "cas_variant": "ABE8e", "edit_type": "base edit" },
+    "notes": "Edge case: ABE8e (~5.5 kb) exceeds the ~4.7 kb AAV cargo limit. Should NOT recommend single AAV; expect dual-AAV, LNP, or eVLP."
+  },
+  {
+    "prompt": "How do I deliver SpCas9 to Arabidopsis protoplasts and callus for a gene knockout?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "Arabidopsis protoplasts and callus", "cas_variant": "SpCas9", "edit_type": "knockout" },
+    "notes": "Edge case: plant cells. Should recommend biolistics (gene gun) or Agrobacterium."
+  },
+  {
+    "prompt": "I need to knock out a gene in vivo in the mouse brain striatum using SaCas9. What's the best delivery?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "in vivo mouse brain (striatum)", "cas_variant": "SaCas9", "edit_type": "knockout" },
+    "notes": "Edge case: in vivo CNS. Should recommend AAV9 or AAV-PHP.eB for CNS tropism."
+  },
+  {
+    "prompt": "What's the best way to do a knock-in with SpCas9 in iPSC-derived cardiomyocytes?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "iPSC-derived cardiomyocytes", "cas_variant": "SpCas9", "edit_type": "knock-in" },
+    "notes": "Edge case: post-mitotic, hard-to-transfect. Typically edit iPSCs before differentiation via RNP electroporation, or use AAV/lentivirus post-diff."
+  },
+  {
+    "prompt": "For clinical therapeutic editing of primary human T cells with SpCas9, what delivery method should I use?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": { "cell_type": "primary human T cells for clinical therapeutic editing", "cas_variant": "SpCas9", "edit_type": "knockout" },
+    "notes": "Edge case: clinical/therapeutic context. Should prefer transient RNP electroporation (gold standard) over integrating lentivirus."
   }
 ]

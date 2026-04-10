@@ -1,8 +1,8 @@
-# delivery_advisor — Skill Guidance for Gemini
+# delivery_advisor — Skill Guidance
 
 ## What this module does
 
-The `delivery_advisor` module helps researchers choose the optimal CRISPR delivery strategy for their specific experimental setup. CRISPR genome editing requires physically delivering editing components (Cas protein, guide RNA, and optionally a donor template) into target cells. The choice of delivery method — lipofection, electroporation, viral vectors, ribonucleoprotein (RNP) complexes, or lipid nanoparticles — depends critically on the cell type, the size of the editing cargo, and the type of edit being performed. This module uses an LLM-in-the-loop approach to reason over these factors and return a ranked set of recommendations with rationale.
+The `delivery_advisor` module helps researchers choose the optimal CRISPR delivery strategy for their specific experimental setup. CRISPR genome editing requires physically delivering editing components (Cas protein, guide RNA, and optionally a donor template) into target cells. The choice of delivery method depends critically on the cell type, the size of the editing cargo, in vivo vs ex vivo context, and the type of edit being performed. This module uses an LLM-in-the-loop approach with an embedded knowledge base of 17 delivery methods spanning classical, viral, and next-generation non-viral approaches, returning a ranked set of recommendations with rationale grounded in curated method profiles.
 
 ---
 
@@ -32,17 +32,39 @@ Recommends and ranks CRISPR delivery methods for a given cell type, Cas variant,
 
 ---
 
-## Delivery method quick reference
+## Delivery method quick reference (17 methods)
 
-| Method | Cargo type | Best for | Limitations |
-|--------|-----------|----------|-------------|
-| Lipofection | Plasmid DNA, RNP, mRNA | Easy-to-transfect cell lines (HEK293, HeLa) | Poor efficiency in primary cells and suspension cells |
-| Electroporation (plasmid) | Plasmid DNA | Broad range of cell types including primary cells | Can cause significant cell death; DNA toxicity in some primary cells |
-| RNP electroporation | Protein + sgRNA | Primary cells, therapeutic applications, high-fidelity editing | Requires purified Cas protein; transient expression only |
-| AAV | ssDNA (< ~4.7 kb) | In vivo delivery, post-mitotic cells (neurons, muscle), liver | Strict cargo size limit (~4.7 kb); SpCas9 too large for single AAV |
-| Lentiviral | RNA → integrating DNA | Stable expression, difficult-to-transfect cells | Genomic integration risk; constitutive expression increases off-targets |
-| LNP (lipid nanoparticle) | mRNA, RNP | In vivo liver targeting, therapeutic applications | Primarily liver-tropic; limited tissue targeting |
-| Microinjection | Any | Zygotes, oocytes, single-cell applications | Low throughput; requires specialized equipment |
+### In vitro / ex vivo
+
+| Method | Cargo | Best for | Limitations |
+|--------|-------|----------|-------------|
+| Lipofection | Plasmid, mRNA, RNP | Easy cell lines (HEK293, HeLa, U2OS, CHO) | Poor in primary, suspension, neurons |
+| Electroporation (nucleic acid) | Plasmid, mRNA | Cell lines resistant to lipofection, iPSCs | Cell death; integration risk with plasmid |
+| RNP electroporation | Cas protein + sgRNA | Primary T cells, HSPCs, iPSCs, clinical ex vivo | Expensive protein; size limits for large editors |
+| Microinjection | Plasmid, mRNA, RNP | Zygotes, oocytes, transgenic animals | Extremely low throughput |
+| Biolistics (gene gun) | Plasmid DNA | Plant cells, callus, chloroplasts | Random integration; tissue damage |
+
+### Viral vectors
+
+| Method | Cargo | Best for | Limitations |
+|--------|-------|----------|-------------|
+| AAV (single) | ≤ ~4.7 kb | In vivo (liver, CNS, muscle, retina); post-mitotic | Cargo limit excludes SpCas9, BE, PE; pre-existing antibodies |
+| Dual-AAV (split-intein) | Split across 2 AAVs | Large editors (SpCas9, BE, PE) in vivo | Co-infection inefficiency; higher viral dose |
+| Lentivirus (integrating) | Up to ~8–10 kb | Stable lines, CRISPR screens, ex vivo T cells/HSPCs | Insertional mutagenesis; sustained Cas9 → off-targets |
+| Non-integrating lentivirus (NILV) | Up to ~8–10 kb | Transient expression in non-dividing cells | Lower titers; transient |
+| Adenovirus (Ad5) | Up to ~8 kb (HD-Ad ~36 kb) | Transient high expression, liver | Highly immunogenic; rarely used clinically |
+
+### Next-generation / in vivo non-viral
+
+| Method | Cargo | Best for | Limitations |
+|--------|-------|----------|-------------|
+| LNP (lipid nanoparticle) | mRNA (Cas9 mRNA + sgRNA) | In vivo liver (Intellia NTLA-2001/2002), repeat dosing | Strong liver tropism; limited other tissues |
+| eVLP (engineered VLP) | Cas/BE/PE protein + gRNA | In vivo large editors without integration | Newer; manufacturing maturing |
+| CPP (cell-penetrating peptide) | Cas9 RNP | Hard ex vivo cells, topical | Endosomal escape bottleneck |
+| Exosome / EV | mRNA, RNP, sgRNA | BBB-crossing CNS delivery, low immunogenicity | Loading inefficient; manufacturing unsolved |
+| CRISPR-Gold | Cas9 RNP + ssDNA donor | In vivo HDR (muscle, brain) | Research-stage; injection-site limited |
+| Polymeric nanoparticle (PBAE, PEI) | Plasmid, mRNA, RNP | Tunable in vivo, lung, tumor | Toxicity varies; less mature than LNPs |
+| Hydrodynamic injection | Naked plasmid | Mouse liver proof-of-concept | Rodent-only; not translatable |
 
 ---
 
@@ -54,3 +76,20 @@ Recommends and ranks CRISPR delivery methods for a given cell type, Cas variant,
 - **Immunogenicity**: Viral vectors can trigger immune responses, especially in vivo. RNP delivery is least immunogenic. Repeated AAV dosing is limited by anti-AAV antibodies.
 - **HDR requirement for knock-in**: Knock-in edits require homology-directed repair, which needs a donor template. This adds to cargo size and works best in dividing cells during S/G2 phase. Consider delivery of both the nuclease and the donor template.
 - **Off-target integration risk**: Plasmid and lentiviral delivery carry risk of random genomic integration. RNP and mRNA delivery are transient and avoid this risk.
+
+---
+
+## Quick decision heuristics
+
+- Ex vivo therapeutic editing (T cells, HSPCs, iPSCs) → RNP electroporation
+- In vivo liver, small Cas → AAV8 or LNP (LNP for transient, AAV for durable)
+- In vivo liver, large editor (BE/PE) → LNP (mRNA), dual-AAV, or eVLP
+- In vivo CNS, small Cas → AAV9 or AAV-PHP.eB
+- In vivo CNS, large editor → dual-AAV, eVLP, or brain-targeted exosomes
+- In vivo muscle → AAV9 (small) or dual-AAV (large)
+- Plant cells → biolistics or Agrobacterium
+- Zygotes / transgenic animals → microinjection of RNP
+- CRISPR screens → integrating lentivirus (pooled library)
+- Easy cell lines → lipofection; hard lines / primaries → electroporation
+- HDR in vivo → CRISPR-Gold or LNP with ssODN
+- Clinical / therapeutic → transient (RNP, LNP, eVLP) over integrating
