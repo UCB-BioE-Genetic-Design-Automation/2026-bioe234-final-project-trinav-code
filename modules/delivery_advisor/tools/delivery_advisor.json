@@ -1,9 +1,9 @@
 {
   "id": "org.bioe234.function.crispr.delivery_advisor.v1",
   "name": "CRISPR Delivery Strategy Advisor",
-  "description": "Recommends and ranks CRISPR delivery methods (lipofection, electroporation, RNP, AAV, lentiviral, etc.) for a given cell type and Cas variant, with rationale and key considerations for each.",
+  "description": "Recommends and ranks CRISPR delivery methods (lipofection, electroporation, RNP, AAV, lentiviral, LNP, eVLP, etc.) for a given cell type and Cas variant, with rationale, KB citations, and key considerations. Also accepts the upstream Construction File Builder output as a `construct` object — extracts cell_type/cas_variant/edit_type from it and cross-checks the builder's kit_choice against the top delivery recommendation.",
   "type": "function",
-  "keywords": ["CRISPR", "delivery", "transfection", "electroporation", "AAV", "RNP", "lipofection", "lentiviral", "Cas9"],
+  "keywords": ["CRISPR", "delivery", "transfection", "electroporation", "AAV", "RNP", "lipofection", "lentiviral", "LNP", "eVLP", "Cas9"],
   "date_created": null,
   "date_last_modified": null,
 
@@ -11,24 +11,33 @@
     {
       "name": "cell_type",
       "type": "string",
-      "description": "The target cell type for CRISPR editing (e.g. 'HEK293', 'primary T cells', 'neurons', 'iPSCs', 'hepatocytes')."
+      "optional": true,
+      "description": "The target cell type (e.g. 'HEK293', 'primary T cells', 'neurons', 'iPSCs', 'hepatocytes'). Required unless `construct` is provided."
     },
     {
       "name": "cas_variant",
       "type": "string",
-      "description": "The CRISPR-Cas variant being used (e.g. 'SpCas9', 'SaCas9', 'CBE4max', 'PE2')."
+      "optional": true,
+      "description": "The CRISPR-Cas variant (e.g. 'SpCas9', 'SaCas9', 'CBE4max', 'PE2'). Required unless `construct` is provided."
     },
     {
       "name": "edit_type",
       "type": "string",
-      "description": "The type of genome edit to perform (e.g. 'knockout', 'knock-in', 'base edit', 'prime edit'). Defaults to 'knockout' if not provided."
+      "optional": true,
+      "description": "The type of genome edit ('knockout', 'knock-in', 'base edit', 'prime edit'). Defaults to 'knockout'."
+    },
+    {
+      "name": "construct",
+      "type": "object",
+      "optional": true,
+      "description": "Upstream Construction File Builder output. Must include cell_type and cas_variant. Optional fields that are consumed when present: edit_type, kit_choice (or vector_backbone) for consistency check, off_target_risk_profile to bias toward transient delivery under high off-target burden. Explicit kwargs override fields in construct."
     }
   ],
 
   "outputs": [
     {
       "type": "object",
-      "description": "A ranked list of delivery methods with suitability ratings, rationale, and key considerations, plus a top recommendation and general advice."
+      "description": "Ranked delivery methods with suitability, rationale, KB citations, and key considerations; plus a top recommendation, general advice, a kit_choice_consistency sanity-check (null-filled when no kit_choice is provided), and excluded_by_prefilter when applicable."
     }
   ],
 
@@ -41,61 +50,85 @@
       },
       "output": {
         "result": {
-          "top_recommendation": "Lipofection (plasmid or RNP)",
+          "top_recommendation": "Lipofection",
           "ranked_methods": [
             {
-              "method": "Lipofection (plasmid)",
+              "method": "Lipofection",
               "suitability": "high",
-              "rationale": "HEK293 cells are highly transfectable with lipid-based reagents. Plasmid delivery of SpCas9 and sgRNA is simple and cost-effective for knockout.",
-              "key_considerations": ["High transfection efficiency in HEK293", "Transient expression reduces off-target risk"]
+              "rationale": "HEK293 is a canonical easy-to-transfect adherent line; plasmid lipofection of SpCas9 is cheap, simple, and high-efficiency.",
+              "key_considerations": ["High transfection efficiency in HEK293", "Transient expression reduces off-target risk"],
+              "citations": ["lipofection"]
             },
             {
               "method": "RNP electroporation",
               "suitability": "high",
-              "rationale": "Pre-assembled Cas9 RNP complexes offer rapid editing with minimal off-target activity due to transient presence.",
-              "key_considerations": ["No DNA integration risk", "Fast clearance reduces off-targets"]
+              "rationale": "Pre-assembled Cas9 RNP gives transient editing with minimal off-target activity due to fast protein clearance.",
+              "key_considerations": ["No DNA integration risk", "Fast clearance reduces off-targets"],
+              "citations": ["rnp_electroporation"]
             },
             {
-              "method": "Lentiviral transduction",
-              "suitability": "medium",
-              "rationale": "Provides stable expression but carries integration risk, which is unnecessary for simple knockouts.",
-              "key_considerations": ["Genomic integration risk", "Constitutive expression increases off-targets"]
+              "method": "Lentivirus (integrating)",
+              "suitability": "low",
+              "rationale": "Stable integration is unnecessary for a simple knockout and adds insertional mutagenesis risk.",
+              "key_considerations": ["Genomic integration risk", "Sustained Cas9 expression increases off-targets"],
+              "citations": ["lentivirus"]
             }
           ],
-          "general_advice": "For HEK293 knockouts with SpCas9, lipofection is the simplest and most cost-effective approach. Consider RNP electroporation if off-target minimization is critical."
+          "general_advice": "For HEK293 SpCas9 knockouts, lipofection is the simplest and most cost-effective option. Use RNP electroporation if off-target minimization is critical.",
+          "kit_choice_consistency": { "kit_choice": null, "consistent": null, "note": null }
         }
       }
     },
     {
       "input": {
-        "cell_type": "primary T cells",
-        "cas_variant": "SpCas9",
-        "edit_type": "knockout"
+        "construct": {
+          "construct_name": "TP53_SpCas9_lentiCRISPRv2_knockout",
+          "target_gene": "TP53",
+          "organism": "human",
+          "cell_type": "HEK293",
+          "cas_variant": "SpCas9",
+          "guide_sequence": "GAGTCCGCAGTCTTAGAGCT",
+          "edit_type": "knockout",
+          "kit_choice": "lentiCRISPRv2",
+          "vector_backbone": "lentiCRISPRv2",
+          "off_target_risk_profile": {
+            "total_off_targets": 2,
+            "mismatch_distribution": {"0MM": 0, "1MM": 0, "2MM": 1, "3MM": 1}
+          }
+        }
       },
       "output": {
         "result": {
-          "top_recommendation": "RNP electroporation",
+          "top_recommendation": "Lipofection",
           "ranked_methods": [
+            {
+              "method": "Lipofection",
+              "suitability": "high",
+              "rationale": "HEK293 is highly transfectable; simple plasmid lipofection of SpCas9 suffices for a knockout.",
+              "key_considerations": ["Cheap and simple", "Transient"],
+              "citations": ["lipofection"]
+            },
+            {
+              "method": "Lentivirus (integrating)",
+              "suitability": "medium",
+              "rationale": "Matches the upstream kit_choice (lentiCRISPRv2), but integration is unnecessary for a transient knockout in an easy line.",
+              "key_considerations": ["Kit is available", "Integration risk not justified for simple KO"],
+              "citations": ["lentivirus"]
+            },
             {
               "method": "RNP electroporation",
               "suitability": "high",
-              "rationale": "Primary T cells are resistant to lipofection but respond well to electroporation. RNP format avoids DNA toxicity in primary immune cells.",
-              "key_considerations": ["Standard method for T cell engineering", "No risk of insertional mutagenesis"]
-            },
-            {
-              "method": "Lentiviral transduction",
-              "suitability": "medium",
-              "rationale": "Can deliver Cas9 efficiently but introduces integration risk, which may be undesirable for therapeutic applications.",
-              "key_considerations": ["Integration risk", "Requires activation of T cells"]
-            },
-            {
-              "method": "AAV",
-              "suitability": "low",
-              "rationale": "AAV has limited cargo capacity and SpCas9 exceeds the packaging limit, making it unsuitable for this combination.",
-              "key_considerations": ["SpCas9 exceeds AAV packaging limit (~4.7 kb)", "Low efficiency in T cells"]
+              "rationale": "Transient RNP minimizes off-target exposure further.",
+              "key_considerations": ["No integration", "Low off-target"],
+              "citations": ["rnp_electroporation"]
             }
           ],
-          "general_advice": "RNP electroporation is the gold standard for editing primary T cells with SpCas9. Optimize electroporation parameters for your specific T cell subtype and activation state."
+          "general_advice": "For TP53 KO in HEK293, lipofection is simpler than lentiviral transduction. If the lentiCRISPRv2 kit is already in hand and a stable pool is desired, the kit_choice is workable but not optimal for a transient knockout.",
+          "kit_choice_consistency": {
+            "kit_choice": "lentiCRISPRv2",
+            "consistent": false,
+            "note": "Upstream chose lentiCRISPRv2 (integrating), but for HEK293 SpCas9 knockout, transient lipofection or RNP is preferred over a lentiviral vector — integration is unnecessary and adds off-target risk."
+          }
         }
       }
     }

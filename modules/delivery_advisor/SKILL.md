@@ -24,11 +24,20 @@ Recommends and ranks CRISPR delivery methods for a given cell type, Cas variant,
 - `cell_type`: The target cell — be specific (e.g. "primary T cells" not just "T cells", "HEK293" not just "human cells")
 - `cas_variant`: The CRISPR editor being used. Common values: SpCas9, SaCas9, Cas12a/Cpf1, CBE4max, ABE8e, PE2, PE3
 - `edit_type`: What kind of edit — "knockout" (default), "knock-in" (requires HDR template), "base edit", "prime edit"
+- `construct` (object, optional): Upstream Construction File Builder output. If provided, the advisor extracts `cell_type`, `cas_variant`, and `edit_type` from it — you do NOT need to pass those separately. The advisor also reads `kit_choice` (or `vector_backbone`), `organism`, `off_target_risk_profile`, `status`, and `warnings` from the construct. The off-target profile may be a structured dict (`{total_off_targets, mismatch_distribution}`) or a free-form string; the advisor classifies it as low/medium/high before passing it to the LLM. Pass the construct whenever the user is chaining this tool after the Construction File Builder.
+
+**When to use `construct` vs explicit kwargs:**
+- User asks a standalone delivery question → use explicit `cell_type` + `cas_variant` + `edit_type`.
+- User pastes or references a construct JSON from the Construction File Builder → pass the whole thing as `construct`. Don't re-extract fields manually.
+- If both are provided, explicit kwargs override construct fields (useful for "what if we used neurons instead?" follow-ups).
 
 **Output interpretation:**
 - `top_recommendation`: The single best method — start here
-- `ranked_methods`: 3-5 options ranked from best to worst, each with a suitability rating (high/medium/low), a rationale explaining why, and key considerations to watch for
+- `ranked_methods`: 3-5 options ranked from best to worst, each with a suitability rating (high/medium/low), a rationale explaining why, key considerations to watch for, and `citations` (KB method keys that justified the recommendation — traceable back to the knowledge base)
 - `general_advice`: Practical tips specific to this cell type + editor combination
+- `kit_choice_consistency`: Sanity-check on the upstream kit. When a `kit_choice` was provided, this block is `{kit_choice, consistent: bool, note: str}`. If `consistent: false`, explain the disagreement to the user — the advisor thinks the builder's kit is suboptimal for this edit. If no kit_choice was provided, all three fields are `null`.
+- `excluded_by_prefilter` (optional): methods that were deterministically ruled out (e.g. single AAV for editors exceeding the ~4.7 kb cargo limit). Mention these when relevant — they explain why an "obvious" method is missing from the ranking.
+- `upstream_construct_warnings` (optional): only present when the upstream construct's `status != "supported"` or `warnings` is non-empty. Surface this to the user before discussing the recommendation — the upstream pipeline flagged a problem that should be resolved before acting on the delivery choice.
 
 ---
 

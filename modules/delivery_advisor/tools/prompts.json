@@ -58,5 +58,20 @@
     "expected_tool": "crispr_delivery_advisor",
     "expected_args": { "cell_type": "primary human T cells for clinical therapeutic editing", "cas_variant": "SpCas9", "edit_type": "knockout" },
     "notes": "Edge case: clinical/therapeutic context. Should prefer transient RNP electroporation (gold standard) over integrating lentivirus."
+  },
+  {
+    "prompt": "Here is the construction file from the builder: {\"construct_name\":\"TP53_SpCas9_lentiCRISPRv2_knockout\",\"cell_type\":\"HEK293\",\"cas_variant\":\"SpCas9\",\"edit_type\":\"knockout\",\"kit_choice\":\"lentiCRISPRv2\",\"off_target_risk_profile\":{\"total_off_targets\":2,\"mismatch_distribution\":{\"0MM\":0,\"1MM\":0,\"2MM\":1,\"3MM\":1}}}. What delivery method should I use, and does the kit choice make sense?",
+    "expected_tool": "crispr_delivery_advisor",
+    "expected_args": {
+      "construct": {
+        "construct_name": "TP53_SpCas9_lentiCRISPRv2_knockout",
+        "cell_type": "HEK293",
+        "cas_variant": "SpCas9",
+        "edit_type": "knockout",
+        "kit_choice": "lentiCRISPRv2",
+        "off_target_risk_profile": { "total_off_targets": 2, "mismatch_distribution": { "0MM": 0, "1MM": 0, "2MM": 1, "3MM": 1 } }
+      }
+    },
+    "notes": "Pipeline integration: advisor consumes the Construction File Builder output verbatim. Should populate kit_choice_consistency; for HEK293 SpCas9 KO the advisor is likely to disagree with a lentiviral kit (transient lipofection/RNP preferred)."
   }
 ]

@@ -1,7 +1,149 @@
-# BioE234 MCP Starter — Student Guide
+# BioE234 Final Project — CRISPR Delivery Strategy Advisor
 
-Welcome! This document is the **primary reference** for the final project starter.  
-Read it top to bottom once before writing any code.
+**Student:** Trinav (GitHub: `trinav-code`, trinav@berkeley.edu)
+**Team theme:** CRISPR experiment design pipeline
+**Individual scope:** the *Delivery Strategy Advisor* MCP tool (`modules/delivery_advisor/`)
+
+> The starter-guide content for running the MCP harness itself is preserved further down
+> this README. This top section is the individual-contribution write-up for grading.
+
+---
+
+## 1. Problem & scope
+
+CRISPR editing requires physically getting Cas protein + guide RNA (and sometimes a donor
+template) into target cells. Picking the right delivery method is non-trivial:
+- Easy cell lines → lipofection, but primary T cells / HSPCs → RNP electroporation.
+- In-vivo liver, small Cas → AAV8 or LNP; large editors (BE / PE) exceed the AAV cargo
+  limit and need dual-AAV, LNP (mRNA), or eVLP.
+- Clinical / therapeutic contexts prefer transient delivery (RNP, LNP) over integrating
+  lentivirus.
+
+Researchers consult review articles or ask a colleague. My tool replaces that step with a
+single MCP call.
+
+**Tool:** `crispr_delivery_advisor` — takes cell type + Cas variant + edit type (or a full
+upstream Construction File object) and returns a ranked list of delivery methods with
+rationale, knowledge-base citations, general advice, and a kit-choice sanity-check
+against the upstream builder.
+
+## 2. Where it fits in the team pipeline
+
+```
+Guide RNA Designer ─► Off-Target Analyzer ─► Construction File Builder ─► [Delivery Advisor] ─► Validation Planner
+                                                        │                       │
+                                                        ▼                       ▼
+                                                 construct object         ranked methods
+                                                 (cell_type, cas_variant,  + kit_choice_consistency
+                                                  edit_type, kit_choice,   (audits the builder's kit)
+                                                  off_target_profile)
+```
+
+The advisor consumes the Construction File Builder's JSON output verbatim via its
+`construct` input — no adapter, no field renaming. It also cross-checks the builder's
+`kit_choice` against its own top recommendation and surfaces agreement or disagreement in
+the output.
+
+## 3. What makes the implementation unique
+
+Most LLM-backed recommendation tools are "prompt the model and hope". This one is a
+three-stage hybrid:
+
+1. **Deterministic pre-filter** (`_prefilter` in `delivery_advisor.py`) — hard rules
+   eliminate infeasible methods before the LLM ever sees them: AAV single vectors are
+   dropped when the Cas variant's cargo exceeds 4.7 kb; hydrodynamic injection is dropped
+   for human / clinical contexts (rodent-only); biolistics is dropped for non-plant cells;
+   microinjection is dropped outside zygote / oocyte / embryo contexts. Excluded methods
+   are passed to the LLM as a "do NOT recommend" block so the model can't re-introduce them.
+
+2. **Knowledge-base-grounded LLM call** — the system prompt is rendered at runtime from
+   `data/methods.json` (17 curated delivery methods + cargo-size table + decision
+   heuristics). The KB lives as versioned JSON, not buried prose in the source — every
+   edit shows up in `git diff`.
+
+3. **Citation enforcement** — the LLM must cite the exact KB `key` values (e.g.
+   `rnp_electroporation`, `dual_aav`) that justified each recommendation. Post-call, the
+   advisor validates every citation against the KB's real keys and annotates
+   `_citation_warnings` if any are hallucinated. A pytest asserts there are zero
+   hallucinations on the reference HEK293 case.
+
+This means a reviewer (or grader) can trace any recommendation back to a specific KB
+entry, and the system can't silently invent a method.
+
+**Pipeline integration layer:** when a `construct` object is passed, the advisor surfaces
+`kit_choice` and `off_target_risk_profile` to the LLM, which fills a
+`kit_choice_consistency` block in the output — a sanity-check for the upstream kit
+selection.
+
+## 4. Inputs / outputs
+
+**Inputs** (either of):
+- Explicit: `cell_type: str`, `cas_variant: str`, `edit_type: str = "knockout"`
+- Pipeline: `construct: dict` (upstream Construction File Builder output)
+
+**Output:** structured JSON
+```jsonc
+{
+  "top_recommendation": "Lipofection",
+  "ranked_methods": [
+    { "method": "...", "suitability": "high|medium|low",
+      "rationale": "...", "key_considerations": [...],
+      "citations": ["lipofection", "rnp_electroporation"] }
+  ],
+  "general_advice": "...",
+  "kit_choice_consistency": {           // null-filled if no kit_choice given
+    "kit_choice": "lentiCRISPRv2",
+    "consistent": false,
+    "note": "Upstream chose lentiCRISPRv2 (integrating), but for HEK293 SpCas9 KO, transient lipofection is preferred — integration is unnecessary and adds off-target risk."
+  },
+  "excluded_by_prefilter": ["aav_single excluded: ABE8e cargo ~5.5 kb > AAV limit 4.7 kb"]
+}
+```
+
+## 5. Files for this contribution
+
+| File | Rubric component |
+|------|------------------|
+| `modules/delivery_advisor/tools/delivery_advisor.py` | Function Code |
+| `modules/delivery_advisor/tools/delivery_advisor.json` | MCP Wrapper |
+| `modules/delivery_advisor/tools/prompts.json` | Test Prompts (11 prompts) |
+| `modules/delivery_advisor/data/methods.json` | Knowledge base (17 methods) |
+| `modules/delivery_advisor/SKILL.md` | AI guidance |
+| `tests/test_delivery_advisor.py` | Pytest (26 tests) |
+| `tests/eval_delivery_advisor.py` | Accuracy eval harness (22 cases) |
+| `tests/eval_results.json` | Last eval run summary (22/22 = 100%) |
+| `delivery_advisor_theory.md` | Theory docs (biology rationale + 3-stage hybrid) |
+
+## 6. Running it
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+# Create .env with ANTHROPIC_API_KEY (advisor uses Claude Haiku 4.5 internally)
+
+# Unit + integration tests (input validation + live API)
+pytest tests/test_delivery_advisor.py -v
+
+# Accuracy eval (22 canonical cases — takes ~4 minutes)
+# Last run: 22/22 top-recommendation accuracy, 22/22 citations valid (see tests/eval_results.json)
+python tests/eval_delivery_advisor.py --verbose
+
+# Full MCP pipeline (uses Gemini as the outer LLM, per course setup)
+python client_gemini.py
+```
+
+Try a prompt like *"What delivery method should I use for a SpCas9 knockout in HEK293 cells?"*
+
+## 7. Latest eval results
+
+| Metric | Result |
+|---|---|
+| Top-recommendation accuracy | **22/22 (100%)** |
+| Citations resolve to real KB keys | 22/22 (100%) |
+| Errors / API failures | 0/22 |
+| Total runtime | 255 s (Claude Haiku 4.5) |
+
+Cases cover easy cell lines, primary/ex vivo (T cells, HSPCs, iPSCs), cargo-size constraints (large editors → no single AAV), in-vivo small-Cas (AAV serotype tropism), post-mitotic neurons, plant cell walls (biolistics / Agrobacterium), zygote microinjection, pooled CRISPR screens, in-vivo HDR, and two pipeline-construct cases (kit agreement + kit disagreement). Full machine-readable summary in `tests/eval_results.json`.
 
 ---
 
