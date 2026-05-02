@@ -270,6 +270,45 @@ class DeliveryAdvisor:
               upstream construct's status != 'supported' or warnings is
               non-empty. Echoes upstream status and warnings so callers
               cannot silently miss an unsupported construct.
+
+    Tests:
+        - Case:
+            Input: cell_type="HEK293", cas_variant="SpCas9", edit_type="knockout"
+            Expected Output: dict with top_recommendation containing
+                "lipofection" or "electroporation"; ranked_methods length 3-5;
+                each method carries citations resolving to real KB keys.
+            Description: Canonical easy-line knockout — the textbook lipofection case.
+        - Case:
+            Input: cell_type="primary T cells", cas_variant="SpCas9",
+                   edit_type="knockout"
+            Expected Output: top_recommendation contains "rnp" or "electroporation"
+                (gold standard for primary immune cells).
+            Description: Refractory primary cells — must NOT recommend lipofection.
+        - Case:
+            Input: cell_type="hepatocytes (in vivo, liver)", cas_variant="ABE8e",
+                   edit_type="base edit"
+            Expected Output: top_recommendation in {LNP, dual-AAV, eVLP};
+                excluded_by_prefilter contains "aav_single excluded ... > 4.7 kb"
+                (ABE8e ~5.5 kb exceeds the AAV cargo limit).
+            Description: Cargo-size hard constraint — pre-filter must drop single AAV.
+        - Case:
+            Input: construct={"cell_type": "HEK293", "cas_variant": "SpCas9",
+                              "edit_type": "knockout", "kit_choice": "lentiCRISPRv2",
+                              "organism": "human", "status": "supported",
+                              "off_target_risk_profile": {...}}
+            Expected Output: kit_choice_consistency.consistent == False with a note
+                explaining lentivirus is suboptimal for HEK293 SpCas9 KO; no
+                upstream_construct_warnings (status is "supported").
+            Description: Pipeline integration — upstream Construction File Builder
+                output consumed verbatim, kit_choice cross-checked against advisor.
+        - Case:
+            Input: cell_type="" (or whitespace-only)
+            Expected Exception: ValueError mentioning "cell_type"
+            Description: Empty / whitespace input is rejected at the boundary.
+        - Case:
+            Input: cell_type="HEK293", cas_variant=""
+            Expected Exception: ValueError mentioning "cas_variant"
+            Description: Empty Cas variant is rejected at the boundary.
     """
 
     api_key: str
